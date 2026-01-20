@@ -1,6 +1,7 @@
 # Test Result (Microservice)
 ***
->Sebelumnya saya minta maaf karena microservicenya tidak selesai dengan baik, ada beberapa masalah, tapi setidaknya aku akan menjelaskan tentang microservice yang dikerjakan , masalah apa yang ingin diselesaikan di microservicenya. Berikut:
+>Sebelumnya saya minta maaf karena microservicenya tidak selesai dengan baik, ada beberapa masalah di servicenya, tapi setidaknya saya akan menjelaskan tentang microservice yang dikerjakan, problem apa yang ingin diselesaikan di microservicenya. Berikut:
+
 ---
 
 ### Masalah yang muncul
@@ -12,17 +13,21 @@ Ketika service kita mengalami gangguan seperti network timeout dan gangguan serv
 
 ### Solusi
 1. Menggunakan idempotency key di request.
-`POST /api/payments
-Header: Idempotency-Key: PAY-IDEMPOTENCY-ORD-123`
+```
+POST /api/payments
+Header: Idempotency-Key: PAY-IDEMPOTENCY-ORD-123
+```
 > Dengan menyimpan idempotent key di database, kita bisa mengembalikan request jika kita menemukan request yang duplikat sebelum melanjutkan proses. 
 2. Untuk mengatasi juga melakukan hal yang sama untuk Duplicate Callback dengan menyimpan callback_id di db
 3. Untuk Mengatasi Network Timeout kita bisa menggunakan metode Circuit Breaker dan retry dengan exponential backoff
-`@Retryable(
+```
+@Retryable(
     value = {NetworkTimeoutException.class},
     maxAttempts = 3,
     backoff = @Backoff(delay = 2000, multiplier = 2)
 )
-// Retry delays: 2s, 4s, 8s`
+// Retry delays: 2s, 4s, 8s
+```
 4. Dan cara terakhir adalah menggunakan Kafka karena Kafka memastikan stidaknya 1 kali delivery message, adanya ordering di dalam partisi.
 
 ### Flow Event
@@ -87,4 +92,110 @@ mvn spring-boot:run
 # Notification Service
 cd notification-service
 mvn spring-boot:run
+```
+
+### Database Schema
+```
+-- Untuk Payment
+CREATE TABLE payments (
+    id BIGSERIAL PRIMARY KEY,
+    payment_id VARCHAR(255) UNIQUE NOT NULL,
+    order_id VARCHAR(255) NOT NULL,
+    idempotency_key VARCHAR(255) UNIQUE NOT NULL,
+    amount DECIMAL(19,2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    gateway_reference VARCHAR(255),
+    version INTEGER NOT NULL,  -- Optimistic locking
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    failure_reason TEXT
+);
+
+-- payment_callbacks table 
+CREATE TABLE payment_callbacks (
+    id BIGSERIAL PRIMARY KEY,
+    callback_id VARCHAR(255) UNIQUE NOT NULL,  -- Untuk mengatasi proses duplicate
+    payment_reference VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    raw_payload TEXT,
+    received_at TIMESTAMP NOT NULL,
+    processed BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX idx_order_id ON payments(order_id);
+CREATE INDEX idx_gateway_ref ON payments(gateway_reference);
+CREATE INDEX idx_callback_payment ON payment_callbacks(payment_reference);
+
+-- Untuk Order
+CREATE TABLE orders (
+    id BIGSERIAL PRIMARY KEY,
+
+    order_id VARCHAR(50) NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+
+    total_amount NUMERIC(15,2) NOT NULL,
+    currency VARCHAR(10) NOT NULL,
+
+    status VARCHAR(30) NOT NULL,
+
+    payment_id VARCHAR(100),
+
+    items TEXT NOT NULL,
+
+    version INTEGER NOT NULL DEFAULT 0,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX uq_orders_order_id
+ON orders(order_id);
+
+CREATE INDEX idx_orders_user_id
+ON orders(user_id);
+
+CREATE INDEX idx_orders_payment_id
+ON orders(payment_id);
+
+CREATE INDEX idx_orders_status
+ON orders(status);
+
+-- Untuk Notification
+CREATE TABLE notification_logs (
+    id BIGSERIAL PRIMARY KEY,
+
+    event_id VARCHAR(150) NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+
+    order_id VARCHAR(50),
+    payment_id VARCHAR(100),
+
+    type VARCHAR(20) NOT NULL,      -- EMAIL, SMS, atau PUSH
+    recipient VARCHAR(150) NOT NULL,
+
+    subject VARCHAR(255) NOT NULL,
+    content TEXT,
+
+    status VARCHAR(20) NOT NULL,    -- PENDING, SENT, atau 	FAILED
+    error_message TEXT,
+
+    retry_count INTEGER NOT NULL DEFAULT 0,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP
+);
+
+-- Idempotency guarantee
+CREATE UNIQUE INDEX uq_notification_event_id
+ON notification_logs(event_id);
+
+CREATE INDEX idx_notification_user_id
+ON notification_logs(user_id);
+
+CREATE INDEX idx_notification_order_id
+ON notification_logs(order_id);
+
+CREATE INDEX idx_notification_status_retry
+ON notification_logs(status, retry_count);
 ```
