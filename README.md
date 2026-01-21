@@ -2,6 +2,7 @@
 ***
 >Sebelumnya saya minta maaf karena microservicenya tidak selesai dengan baik, ada beberapa masalah di servicenya, tapi setidaknya saya akan menjelaskan tentang microservice yang dikerjakan, problem apa yang ingin diselesaikan di microservicenya. Berikut:
 
+>Note : Walaupun waktu testnya sudah habis aku akan tetap upload hasil yang sudah di saya fix perlahan dan cara testnya nantinya di branch`fix`.
 ---
 
 ### Masalah yang muncul
@@ -30,7 +31,7 @@ Header: Idempotency-Key: PAY-IDEMPOTENCY-ORD-123
 ```
 4. Dan cara terakhir adalah menggunakan Kafka karena Kafka memastikan stidaknya 1 kali delivery message, adanya ordering di dalam partisi.
 
-### Flow Event
+### Asumsi Flow Event
 
 User creates order
     ↓
