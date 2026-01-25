@@ -65,7 +65,7 @@ Notification Service consumes event/message
     |-- Check event ID (sudah diproses? → skip)
     |-- send notification
 
-### Quick Start
+### Quick Start and Test Guide
 1. Masuk ke folder docker untuk menjalannkan docker-compose
 ```
 //start container
@@ -93,6 +93,59 @@ mvn spring-boot:run
 # Notification Service
 cd notification-service
 mvn spring-boot:run
+```
+4. Test Normal Payment Flow
+```
+-- Health Check
+# Check Payment Service
+curl http://localhost:8081/actuator/health
+# Expected: {"status":"UP"}
+# Check Order Service
+curl http://localhost:8082/actuator/health
+# Check Notification Service
+curl http://localhost:8083/actuator/health
+
+
+# 1. Create order - Note : Masih Gagal
+curl -X POST http://localhost:8082/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user123",
+    "items": [
+      {
+        "productId": "prod-1",
+        "productName": "Laptop",
+        "quantity": 1,
+        "price": 1000.00
+      }
+    ],
+    "currency": "USD"
+  }'
+
+# Response:
+{
+  "orderId": "ORD-abc-123",
+  "status": "PAYMENT_PENDING",
+  "totalAmount": 1000.00,
+  "paymentId": "PAY-xyz-456"
+}
+
+# 2. Check payment status
+curl http://localhost:8081/api/payments/PAY-xyz-456
+
+# 3. Simulate payment gateway callback (success)
+curl -X POST http://localhost:8081/api/payments/callback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "callbackId": "CB-unique-123",
+    "paymentReference": "PAY-xyz-456",
+    "status": "SUCCESS",
+    "transactionId": "GW-txn-789"
+  }'
+
+# 4. Verify order status updated
+curl http://localhost:8082/api/orders/ORD-abc-123
+# Status should be: PAID
 ```
 
 ### Database Schema
