@@ -7,17 +7,17 @@ import jakarta.validation.constraints.NotBlank;
 public class PaymentCallbackRequest {
     
     @NotBlank
-    private String callbackId; // Gateway provides unique callback ID
+    private String callbackId;
     
     @NotBlank
-    private String paymentReference; // Our payment ID
+    private String paymentReference;
     
     @NotBlank
-    private String status; // SUCCESS, FAILED, etc.
+    private String status;
     
-    private String transactionId; // Gateway's transaction ID
+    private String transactionId;
     
     private String failureReason;
     
-    private String signature; // For webhook verification
+    private String signature;
 }

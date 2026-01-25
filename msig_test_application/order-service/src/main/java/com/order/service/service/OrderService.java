@@ -3,7 +3,6 @@ package com.order.service.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.order.service.client.PaymentServiceClient;
 import com.order.service.dto.*;
-import com.order.service.dto.CreatePaymentRequest;
 import com.order.service.event.OrderEvent;
 import com.order.service.event.PaymentEvent;
 import com.order.service.exception.PaymentInitiationException;
@@ -220,6 +219,16 @@ public class OrderService {
             throw new RuntimeException("Failed to serialize items", e);
         }
     }
+
+    public List<OrderResponse> getOrdersByUser(String userId) {
+    log.info("Getting orders for user: {}", userId);
+    
+    List<Order> orders = orderRepository.findByUserId(userId);
+    
+    return orders.stream()
+        .map(this::mapToResponse)
+        .collect(java.util.stream.Collectors.toList());
+}
     
     private OrderResponse mapToResponse(Order order) {
         return OrderResponse.builder()

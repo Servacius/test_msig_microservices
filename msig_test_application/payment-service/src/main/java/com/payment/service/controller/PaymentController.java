@@ -18,10 +18,6 @@ public class PaymentController {
     
     private final PaymentService paymentService;
     
-    /**
-     * Create payment with idempotency
-     * Idempotency-Key header prevents double charging
-     */
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(
             @Valid @RequestBody CreatePaymentRequest request,
@@ -29,14 +25,12 @@ public class PaymentController {
         
         log.info("Received payment request for order: {}", request.getOrderId());
         
-        // Use header idempotency key if provided, otherwise use from body
         if (idempotencyKey != null) {
             request.setIdempotencyKey(idempotencyKey);
         }
         
         PaymentResponse response = paymentService.createPayment(request);
         
-        // Return 200 for existing payment (idempotent), 201 for new
         HttpStatus status = response.getCreatedAt().isBefore(
             java.time.LocalDateTime.now().minusSeconds(5)) 
             ? HttpStatus.OK : HttpStatus.CREATED;
@@ -44,10 +38,6 @@ public class PaymentController {
         return ResponseEntity.status(status).body(response);
     }
     
-    /**
-     * Webhook endpoint for payment gateway callbacks
-     * CRITICAL: Must handle duplicate callbacks
-     */
     @PostMapping("/callback")
     public ResponseEntity<Void> handleCallback(
             @Valid @RequestBody PaymentCallbackRequest request) {
@@ -61,19 +51,19 @@ public class PaymentController {
             
         } catch (Exception e) {
             log.error("Error processing callback: {}", request.getCallbackId(), e);
-            // Return 200 anyway to prevent gateway from retrying
-            // We've stored the callback for manual review
             return ResponseEntity.ok().build();
         }
     }
     
-    /**
-     * Get payment status
-     */
     @GetMapping("/{paymentId}")
     public ResponseEntity<PaymentResponse> getPayment(@PathVariable String paymentId) {
         log.info("Getting payment: {}", paymentId);
         PaymentResponse response = paymentService.getPayment(paymentId);
         return ResponseEntity.ok(response);
+    }
+    
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Payment Service is running");
     }
 }
